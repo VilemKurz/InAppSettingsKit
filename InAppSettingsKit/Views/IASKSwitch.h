@@ -15,9 +15,10 @@
 //
 
 #import <UIKit/UIKit.h>
+#import "JKSwitch.h"
 
 
-@interface IASKSwitch : UISwitch {
+@interface IASKSwitch : JKSwitch {
     NSString *_key;
 }
 

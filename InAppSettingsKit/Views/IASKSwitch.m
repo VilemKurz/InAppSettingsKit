@@ -21,6 +21,16 @@
 
 @synthesize key=_key;
 
+- (id)initWithFrame:(CGRect)frame {
+    
+    self = [super initWithOrigin:frame.origin
+                 backgroundImage:[UIImage imageNamed:@"switchBg"]
+                       maskImage:nil
+                     buttonImage:[UIImage imageNamed:@"switchButton"]
+                     borderImage:[UIImage imageNamed:@"switchBorder"]];
+    return self;
+}
+
 - (void)dealloc {
     [_key release], _key = nil;
 	
