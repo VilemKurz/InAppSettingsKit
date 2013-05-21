@@ -25,10 +25,39 @@
     
     self = [super initWithOrigin:frame.origin
                  backgroundImage:[UIImage imageNamed:@"switchBg"]
-                       maskImage:nil
                      buttonImage:[UIImage imageNamed:@"switchButton"]
                      borderImage:[UIImage imageNamed:@"switchBorder"]];
+    
+    if (self) {
+        
+        UILabel *leftView = [[UILabel alloc] initWithFrame:CGRectZero];
+        leftView.text = NSLocalizedString(@"ON", @"on switch text");
+        leftView.textAlignment = UITextAlignmentLeft;
+        [self setupSwitchLabel:leftView];
+        self.leftView = leftView;
+        
+        self.leftViewInsets = UIEdgeInsetsMake(3, 12, 0, 0);
+        
+        UILabel *rightView = [[UILabel alloc] initWithFrame:CGRectZero];
+        rightView.text = NSLocalizedString(@"OFF", @"off switch text");
+        rightView.textAlignment = UITextAlignmentRight;
+        [self setupSwitchLabel:rightView];
+        self.rightView = rightView;
+        
+        self.rightViewInsets = UIEdgeInsetsMake(3, 0, 0, 12);
+    }
+    
     return self;
+}
+
+- (void)setupSwitchLabel:(UILabel *)label {
+    
+    //label.textAlignment = UITextAlignmentCenter;
+    label.backgroundColor = [UIColor clearColor];
+    label.font = [UIFont boldSystemFontOfSize:16];
+    label.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.75];
+    label.shadowColor = [[UIColor blackColor] colorWithAlphaComponent:0.25];
+    label.shadowOffset = CGSizeMake(0, -1);
 }
 
 - (void)dealloc {
@@ -36,6 +65,5 @@
 	
     [super dealloc];
 }
-
 
 @end
