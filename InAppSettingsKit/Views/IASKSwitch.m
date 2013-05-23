@@ -35,6 +35,7 @@
         leftView.textAlignment = UITextAlignmentLeft;
         [self setupSwitchLabel:leftView];
         self.leftView = leftView;
+        [leftView release];
         
         self.leftViewInsets = UIEdgeInsetsMake(3, 12, 0, 0);
         
@@ -43,6 +44,7 @@
         rightView.textAlignment = UITextAlignmentRight;
         [self setupSwitchLabel:rightView];
         self.rightView = rightView;
+        [rightView release];
         
         self.rightViewInsets = UIEdgeInsetsMake(3, 0, 0, 12);
     }
