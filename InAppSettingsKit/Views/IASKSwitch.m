@@ -47,6 +47,7 @@
         [rightView release];
         
         self.rightViewInsets = UIEdgeInsetsMake(3, 0, 0, 12);
+        self.horizontalButtonOffset = 2;
     }
     
     return self;

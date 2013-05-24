@@ -15,10 +15,10 @@
 //
 
 #import <UIKit/UIKit.h>
-#import "JKSwitch.h"
+#import "VKRSChameleonSwitch.h"
 
 
-@interface IASKSwitch : JKSwitch {
+@interface IASKSwitch : VKRSChameleonSwitch {
     NSString *_key;
 }
 
