@@ -31,7 +31,6 @@
     if (self) {
         
         UILabel *leftView = [[UILabel alloc] initWithFrame:CGRectZero];
-        leftView.text = NSLocalizedString(@"ON", @"on switch text");
         leftView.textAlignment = UITextAlignmentLeft;
         [self setupSwitchLabel:leftView];
         self.leftView = leftView;
@@ -40,13 +39,12 @@
         self.leftViewInsets = UIEdgeInsetsMake(3, 12, 0, 0);
         
         UILabel *rightView = [[UILabel alloc] initWithFrame:CGRectZero];
-        rightView.text = NSLocalizedString(@"OFF", @"off switch text");
-        rightView.textAlignment = UITextAlignmentRight;
+        rightView.textAlignment = UITextAlignmentLeft;
         [self setupSwitchLabel:rightView];
         self.rightView = rightView;
         [rightView release];
         
-        self.rightViewInsets = UIEdgeInsetsMake(3, 0, 0, 12);
+        self.rightViewInsets = UIEdgeInsetsMake(3, 9, 0, 0);
         self.horizontalButtonOffset = 2;
     }
     
