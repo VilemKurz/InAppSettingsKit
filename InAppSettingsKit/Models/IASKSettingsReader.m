@@ -30,7 +30,10 @@
     if (self) {
         _applicationBundle = [bundle retain];
         
-        NSString* plistFilePath = [self locateSettingsFile: fileName];
+        //NSString* plistFilePath = [self locateSettingsFile: fileName];
+        
+        //Changed as some strings are common and there is no point in translating them twice, so we use main Localizable for IASK translations too.
+        NSString *plistFilePath = [[NSBundle mainBundle] pathForResource:@"Root" ofType:@"plist"];
         _settingsDictionary = [[NSDictionary dictionaryWithContentsOfFile:plistFilePath] retain];
         
         //store the bundle which we'll need later for getting localizations

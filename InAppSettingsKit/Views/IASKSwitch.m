@@ -31,20 +31,18 @@
     if (self) {
         
         UILabel *leftView = [[UILabel alloc] initWithFrame:CGRectZero];
-        leftView.textAlignment = UITextAlignmentLeft;
         [self setupSwitchLabel:leftView];
         self.leftView = leftView;
         [leftView release];
         
-        self.leftViewInsets = UIEdgeInsetsMake(3, 12, 0, 0);
+        self.leftViewInsets = UIEdgeInsetsMake(3, 8, 0, 0);
         
         UILabel *rightView = [[UILabel alloc] initWithFrame:CGRectZero];
-        rightView.textAlignment = UITextAlignmentLeft;
         [self setupSwitchLabel:rightView];
         self.rightView = rightView;
         [rightView release];
         
-        self.rightViewInsets = UIEdgeInsetsMake(3, 9, 0, 0);
+        self.rightViewInsets = UIEdgeInsetsMake(3, 0, 0, 8);
         self.horizontalButtonOffset = 2;
     }
     
@@ -53,7 +51,7 @@
 
 - (void)setupSwitchLabel:(UILabel *)label {
     
-    //label.textAlignment = UITextAlignmentCenter;
+    label.textAlignment = UITextAlignmentCenter;
     label.backgroundColor = [UIColor clearColor];
     label.font = [UIFont boldSystemFontOfSize:16];
     label.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.75];
