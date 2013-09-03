@@ -85,4 +85,9 @@
 - (void)synchronizeSettings;
 - (void)dismiss:(id)sender;
 - (void)setHiddenKeys:(NSSet*)hiddenKeys animated:(BOOL)animated;
+
+#pragma mark - CDN methods used directly by CDN
+
+- (void)toggledValue:(id)sender;
+
 @end
