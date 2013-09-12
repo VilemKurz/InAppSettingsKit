@@ -26,6 +26,7 @@
 #import "IASKSpecifier.h"
 #import "IASKSpecifierValuesViewController.h"
 #import "IASKTextField.h"
+#import "WMSettingsTableViewCell.h"
 
 static const CGFloat KEYBOARD_ANIMATION_DURATION = 0.3;
 static const CGFloat MINIMUM_SCROLL_FRACTION = 0.2;
@@ -472,7 +473,7 @@ CGRect IASKCGRectSwap(CGRect rect);
 		cell.selectionStyle = UITableViewCellSelectionStyleNone;
 	}
 	else if ([identifier isEqualToString:kIASKPSMultiValueSpecifier] || [identifier isEqualToString:kIASKPSTitleValueSpecifier]) {
-		cell = [[IASKPSTitleValueSpecifierViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:identifier];
+		cell = [[WMSettingsTableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:identifier];
 		cell.accessoryType = [identifier isEqualToString:kIASKPSMultiValueSpecifier] ? UITableViewCellAccessoryDisclosureIndicator : UITableViewCellAccessoryNone;
 	}
 	else if ([identifier isEqualToString:kIASKPSTextFieldSpecifier]) {
@@ -488,7 +489,7 @@ CGRect IASKCGRectSwap(CGRect rect);
 		cell = [[IASKPSTitleValueSpecifierViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:identifier];
 		[cell setAccessoryType:UITableViewCellAccessoryDisclosureIndicator];
 	} else {
-		cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:identifier];
+		cell = [[WMSettingsTableViewCell/*UITableViewCell*/ alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:identifier];
 	}
 	cell.textLabel.minimumFontSize = kIASKMinimumFontSize;
 	cell.detailTextLabel.minimumFontSize = kIASKMinimumFontSize;
