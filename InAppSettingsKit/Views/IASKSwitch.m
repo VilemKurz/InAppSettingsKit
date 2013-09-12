@@ -51,7 +51,7 @@
 
 - (void)setupSwitchLabel:(UILabel *)label {
     
-    label.textAlignment = UITextAlignmentCenter;
+    label.textAlignment = NSTextAlignmentCenter;
     label.backgroundColor = [UIColor clearColor];
     label.font = [UIFont boldSystemFontOfSize:16];
     label.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.75];
