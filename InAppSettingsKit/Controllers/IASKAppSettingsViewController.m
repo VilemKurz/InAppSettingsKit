@@ -45,7 +45,6 @@ static NSString *kIASKCredits = @"Powered by InAppSettingsKit"; // Leave this as
 CGRect IASKCGRectSwap(CGRect rect);
 
 @interface IASKAppSettingsViewController () {
-    IASKSettingsReader		*_settingsReader;
     id<IASKSettingsStore>  _settingsStore;
     
     id                      _currentFirstResponder;
