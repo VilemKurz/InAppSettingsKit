@@ -19,8 +19,6 @@
 
 @implementation IASKSwitch
 
-@synthesize key=_key;
-
 - (id)initWithFrame:(CGRect)frame {
     
     self = [super initWithOrigin:frame.origin
@@ -33,14 +31,12 @@
         UILabel *leftView = [[UILabel alloc] initWithFrame:CGRectZero];
         [self setupSwitchLabel:leftView];
         self.leftView = leftView;
-        [leftView release];
         
         self.leftViewInsets = UIEdgeInsetsMake(3, 8, 0, 0);
         
         UILabel *rightView = [[UILabel alloc] initWithFrame:CGRectZero];
         [self setupSwitchLabel:rightView];
         self.rightView = rightView;
-        [rightView release];
         
         self.rightViewInsets = UIEdgeInsetsMake(3, 0, 0, 8);
         self.horizontalButtonOffset = 2;
@@ -57,12 +53,6 @@
     label.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.75];
     label.shadowColor = [[UIColor blackColor] colorWithAlphaComponent:0.25];
     label.shadowOffset = CGSizeMake(0, -1);
-}
-
-- (void)dealloc {
-    [_key release], _key = nil;
-	
-    [super dealloc];
 }
 
 @end

@@ -18,10 +18,8 @@
 #import "VKRSChameleonSwitch.h"
 
 
-@interface IASKSwitch : VKRSChameleonSwitch {
-    NSString *_key;
-}
+@interface IASKSwitch : VKRSChameleonSwitch
 
-@property (nonatomic, retain) NSString *key;
+@property (nonatomic, copy) NSString *key;
 
 @end
