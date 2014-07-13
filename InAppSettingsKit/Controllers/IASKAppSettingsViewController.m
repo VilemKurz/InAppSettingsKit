@@ -46,6 +46,7 @@ CGRect IASKCGRectSwap(CGRect rect);
     
     id                      _currentFirstResponder;
     __weak UIViewController *_currentChildViewController;
+    BOOL _reloadDisabled;
 }
 
 @property (nonatomic, strong) id currentFirstResponder;
@@ -89,7 +90,7 @@ CGRect IASKCGRectSwap(CGRect rect);
     self.tableView.contentOffset = CGPointMake(0, 0);
     self.settingsReader = nil; // automatically initializes itself
     _hiddenKeys = nil;
-    [self.tableView reloadData];
+    if (!_reloadDisabled) [self.tableView reloadData];
 }
 
 - (BOOL)isPad {
@@ -112,6 +113,7 @@ CGRect IASKCGRectSwap(CGRect rect);
     }
     self = [super initWithStyle:UITableViewStyleGrouped];
     if (self) {
+        _reloadDisabled = NO;
         _showDoneButton = YES;
         // If set to YES, will display credits for InAppSettingsKit creators
         _showCreditsFooter = YES;
@@ -128,7 +130,7 @@ CGRect IASKCGRectSwap(CGRect rect);
     return [self initWithStyle:UITableViewStyleGrouped];
 }
 
-- (void) viewDidLoad {
+- (void)viewDidLoad {
     [super viewDidLoad];
     if ([self isPad]) {
 #if __IPHONE_OS_VERSION_MAX_ALLOWED >= 70000
@@ -195,6 +197,10 @@ CGRect IASKCGRectSwap(CGRect rect);
 
 - (void)viewWillDisappear:(BOOL)animated {
 	[NSObject cancelPreviousPerformRequestsWithTarget:self];
+
+	// hide the keyboard
+    [self.currentFirstResponder resignFirstResponder];
+	
 	[super viewWillDisappear:animated];
 }
 
@@ -205,9 +211,6 @@ CGRect IASKCGRectSwap(CGRect rect);
 	[dc removeObserver:self name:UIApplicationWillEnterForegroundNotification object:[UIApplication sharedApplication]];
 	[dc removeObserver:self name:UIApplicationWillTerminateNotification object:[UIApplication sharedApplication]];
 
-    // hide the keyboard
-    [self.currentFirstResponder resignFirstResponder];
-	
 	[super viewDidDisappear:animated];
 }
 
@@ -292,7 +295,7 @@ CGRect IASKCGRectSwap(CGRect rect);
             [self.tableView endUpdates];
         } else {
             self.settingsReader.hiddenKeys = theHiddenKeys;
-            [self.tableView reloadData];
+            if (!_reloadDisabled) [self.tableView reloadData];
         }
     }
     UIViewController *childViewController = _currentChildViewController;
@@ -401,11 +404,22 @@ CGRect IASKCGRectSwap(CGRect rect);
 		}
 		
 	}
-	NSString *title;
-	if ((title = [self tableView:tableView titleForHeaderInSection:section])) {
-		CGSize size = [title sizeWithFont:[UIFont boldSystemFontOfSize:[UIFont labelFontSize]] 
-						constrainedToSize:CGSizeMake(tableView.frame.size.width - 2*kIASKHorizontalPaddingGroupTitles, INFINITY)
-							lineBreakMode:NSLineBreakByWordWrapping];
+	NSString *title = [self tableView:tableView titleForHeaderInSection:section];
+	if ([title length] > 0) {
+		CGSize size = CGSizeZero;
+		IASK_IF_PRE_IOS7
+		(
+		 size = [title sizeWithFont:[UIFont boldSystemFontOfSize:[UIFont labelFontSize]]
+                  constrainedToSize:CGSizeMake(tableView.frame.size.width - 2*kIASKHorizontalPaddingGroupTitles, INFINITY)
+					  lineBreakMode:NSLineBreakByWordWrapping];
+		 );
+		IASK_IF_IOS7_OR_GREATER
+		(
+		 size = [title boundingRectWithSize:CGSizeMake(tableView.frame.size.width - 2*kIASKHorizontalPaddingGroupTitles, INFINITY)
+									options:NSStringDrawingUsesLineFragmentOrigin
+								 attributes:@{NSFontAttributeName: [UIFont boldSystemFontOfSize:[UIFont labelFontSize]]}
+									context:nil].size;
+		);
 		return roundf(size.height+kIASKVerticalPaddingGroupTitles);
 	}
 	return 0;
@@ -424,12 +438,10 @@ CGRect IASKCGRectSwap(CGRect rect);
 			return [NSString stringWithFormat:@"%@\n\n%@", footerText, kIASKCredits];
 		}
 	} else {
-		if ([footerText length] == 0) {
-			return nil;
-		}
-		return [self.settingsReader footerTextForSection:section];
+		return footerText;
 	}
 }
+
 
 - (UITableViewCell*)newCellForIdentifier:(NSString*)identifier {
 	UITableViewCell *cell = nil;
@@ -458,8 +470,10 @@ CGRect IASKCGRectSwap(CGRect rect);
 	} else {
 		cell = [[WMSettingsTableViewCell/*UITableViewCell*/ alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:identifier];
 	}
-	cell.textLabel.minimumFontSize = kIASKMinimumFontSize;
-	cell.detailTextLabel.minimumFontSize = kIASKMinimumFontSize;
+	IASK_IF_PRE_IOS6(cell.textLabel.minimumFontSize = kIASKMinimumFontSize;
+					 cell.detailTextLabel.minimumFontSize = kIASKMinimumFontSize;);
+	IASK_IF_IOS6_OR_GREATER(cell.textLabel.minimumScaleFactor = kIASKMinimumFontSize / cell.textLabel.font.pointSize;
+							cell.detailTextLabel.minimumScaleFactor = kIASKMinimumFontSize / cell.detailTextLabel.font.pointSize;);
 	return cell;
 }
 
@@ -562,6 +576,7 @@ CGRect IASKCGRectSwap(CGRect rect);
 	} else if ([specifier.type isEqualToString:kIASKButtonSpecifier]) {
 		NSString *value = [self.settingsStore objectForKey:specifier.key];
 		cell.textLabel.text = [value isKindOfClass:[NSString class]] ? [self.settingsReader titleForStringId:value] : specifier.title;
+		cell.accessoryType = (specifier.textAlignment == NSTextAlignmentLeft) ? UITableViewCellAccessoryDisclosureIndicator : UITableViewCellAccessoryNone;
 	} else {
 		cell.textLabel.text = specifier.title;
 	}
@@ -605,14 +620,25 @@ CGRect IASKCGRectSwap(CGRect rect);
         [targetViewController setCurrentSpecifier:specifier];
         targetViewController.settingsReader = self.settingsReader;
         targetViewController.settingsStore = self.settingsStore;
+		targetViewController.view.tintColor = self.view.tintColor;
         _currentChildViewController = targetViewController;
         [[self navigationController] pushViewController:targetViewController animated:YES];
         
     } else if ([[specifier type] isEqualToString:kIASKPSTextFieldSpecifier]) {
         IASKPSTextFieldSpecifierViewCell *textFieldCell = (id)[tableView cellForRowAtIndexPath:indexPath];
         [textFieldCell.textField becomeFirstResponder];
-        
+
     } else if ([[specifier type] isEqualToString:kIASKPSChildPaneSpecifier]) {
+        if ([specifier viewControllerStoryBoardID]){
+            NSString *storyBoardFileFromSpecifier = [specifier viewControllerStoryBoardFile];
+            storyBoardFileFromSpecifier = storyBoardFileFromSpecifier && storyBoardFileFromSpecifier.length > 0 ? storyBoardFileFromSpecifier : @"MainStoryboard";
+			UIStoryboard *storyBoard = [UIStoryboard storyboardWithName:storyBoardFileFromSpecifier bundle:nil];
+			UIViewController * vc = [storyBoard instantiateViewControllerWithIdentifier:[specifier viewControllerStoryBoardID]];
+			vc.view.tintColor = self.view.tintColor;
+            [self.navigationController pushViewController:vc animated:YES];
+			return;
+		}
+        
         Class vcClass = [specifier viewControllerClass];
         if (vcClass) {
             SEL initSelector = [specifier viewControllerSelector];
@@ -622,7 +648,7 @@ CGRect IASKCGRectSwap(CGRect rect);
             UIViewController * vc = [vcClass alloc];
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-            vc = [vc performSelector:initSelector withObject:[specifier file] withObject:[specifier key]];
+            vc = [vc performSelector:initSelector withObject:[specifier file] withObject:specifier];
 #pragma clang diagnostic pop
             if ([vc respondsToSelector:@selector(setDelegate:)]) {
                 [vc performSelector:@selector(setDelegate:) withObject:self.delegate];
@@ -630,6 +656,7 @@ CGRect IASKCGRectSwap(CGRect rect);
             if ([vc respondsToSelector:@selector(setSettingsStore:)]) {
                 [vc performSelector:@selector(setSettingsStore:) withObject:self.settingsStore];
             }
+			vc.view.tintColor = self.view.tintColor;
             [self.navigationController pushViewController:vc animated:YES];
             return;
         }
@@ -639,16 +666,24 @@ CGRect IASKCGRectSwap(CGRect rect);
             return;
         }
         
+        _reloadDisabled = YES; // Disable internal unnecessary reloads
+        
         IASKAppSettingsViewController *targetViewController = [[[self class] alloc] init];
         targetViewController.showDoneButton = NO;
-        targetViewController.settingsStore = self.settingsStore;
+        targetViewController.showCreditsFooter = NO; // Does not reload the tableview (but next setters do it)
         targetViewController.delegate = self.delegate;
+        targetViewController.settingsStore = self.settingsStore;
         targetViewController.file = specifier.file;
         targetViewController.hiddenKeys = self.hiddenKeys;
         targetViewController.title = specifier.title;
-        targetViewController.showCreditsFooter = NO;
+		targetViewController.view.tintColor = self.view.tintColor;
         _currentChildViewController = targetViewController;
+        
+        _reloadDisabled = NO;
+        [self.tableView reloadData];
+        
         [[self navigationController] pushViewController:targetViewController animated:YES];
+        
     } else if ([[specifier type] isEqualToString:kIASKOpenURLSpecifier]) {
         [tableView deselectRowAtIndexPath:indexPath animated:YES];
         [[UIApplication sharedApplication] openURL:[NSURL URLWithString:specifier.file]];
@@ -679,8 +714,7 @@ CGRect IASKCGRectSwap(CGRect rect);
             MFMailComposeViewController *mailViewController = [[MFMailComposeViewController alloc] init];
             mailViewController.navigationBar.barStyle = self.navigationController.navigationBar.barStyle;
             mailViewController.navigationBar.tintColor = self.navigationController.navigationBar.tintColor;
-            mailViewController.navigationBar.titleTextAttributes =
-            self.navigationController.navigationBar.titleTextAttributes;
+            mailViewController.navigationBar.titleTextAttributes =  self.navigationController.navigationBar.titleTextAttributes;
             
             if ([specifier localizedObjectForKey:kIASKMailComposeSubject]) {
                 [mailViewController setSubject:[specifier localizedObjectForKey:kIASKMailComposeSubject]];
@@ -721,9 +755,11 @@ CGRect IASKCGRectSwap(CGRect rect);
             
             mailViewController.mailComposeDelegate = vc;
             _currentChildViewController = mailViewController;
-            [vc presentViewController:mailViewController
-                             animated:YES
-                           completion:nil];
+            UIStatusBarStyle savedStatusBarStyle = [UIApplication sharedApplication].statusBarStyle;
+            [vc presentViewController:mailViewController animated:YES completion:^{
+			    [UIApplication sharedApplication].statusBarStyle = savedStatusBarStyle;
+            }];
+			
         } else {
             UIAlertView *alert = [[UIAlertView alloc]
                                   initWithTitle:NSLocalizedString(@"Mail not configured", @"InAppSettingsKit")
@@ -812,8 +848,9 @@ static NSDictionary *oldUserDefaults = nil;
 		}
 	}
 	if (indexPathsToUpdate.count) {
-		//animation type on iOS7 causes blinking (reloads background)
-        [self.tableView reloadData];
+		dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+			[self.tableView reloadRowsAtIndexPaths:indexPathsToUpdate withRowAnimation:UITableViewRowAnimationNone];
+		});
 	}
 }
 
