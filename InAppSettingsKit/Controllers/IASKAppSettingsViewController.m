@@ -25,6 +25,7 @@
 #import "IASKSpecifier.h"
 #import "IASKSpecifierValuesViewController.h"
 #import "IASKTextField.h"
+#import "IASKTextViewCell.h"
 #import "IASKMultipleValueSelection.h"
 
 #if !__has_feature(objc_arc)
@@ -40,7 +41,7 @@ static NSString *kIASKCredits = @"Powered by InAppSettingsKit"; // Leave this as
 
 CGRect IASKCGRectSwap(CGRect rect);
 
-@interface IASKAppSettingsViewController () {
+@interface IASKAppSettingsViewController () <UITextViewDelegate> {
     id<IASKSettingsStore>  _settingsStore;
     
     id                      _currentFirstResponder;
@@ -51,6 +52,7 @@ CGRect IASKCGRectSwap(CGRect rect);
 }
 
 @property (nonatomic, strong) id currentFirstResponder;
+@property (nonatomic, strong) NSMutableDictionary *rowHeights;
 
 - (void)_textChanged:(id)sender;
 - (void)synchronizeSettings;
@@ -165,6 +167,7 @@ CGRect IASKCGRectSwap(CGRect rect);
 	_reloadDisabled = NO;
 	_showDoneButton = YES;
 	_showCreditsFooter = YES; // display credits for InAppSettingsKit creators
+	self.rowHeights = [NSMutableDictionary dictionary];
 }
 
 - (void)viewDidLoad {
@@ -181,14 +184,20 @@ CGRect IASKCGRectSwap(CGRect rect);
 }
 
 - (void)viewWillAppear:(BOOL)animated {
+	NSIndexPath *selectedIndexPath = [self.tableView indexPathForSelectedRow];
+
+	[super viewWillAppear:animated];
+
 	// if there's something selected, the value might have changed
 	// so reload that row
-	NSIndexPath *selectedIndexPath = [self.tableView indexPathForSelectedRow];
 	if(selectedIndexPath) {
-		[self.tableView reloadRowsAtIndexPaths:[NSArray arrayWithObject:selectedIndexPath] 
-							  withRowAnimation:UITableViewRowAnimationNone];
-		// and reselect it, so we get the nice default deselect animation from UITableViewController
-		[self.tableView selectRowAtIndexPath:selectedIndexPath animated:NO scrollPosition:UITableViewScrollPositionNone];
+		dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(animated * UINavigationControllerHideShowBarDuration * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+			[self.tableView reloadRowsAtIndexPaths:[NSArray arrayWithObject:selectedIndexPath]
+								  withRowAnimation:UITableViewRowAnimationNone];
+			// and reselect it, so we get the nice default deselect animation from UITableViewController
+			[self.tableView selectRowAtIndexPath:selectedIndexPath animated:NO scrollPosition:UITableViewScrollPositionNone];
+			[self.tableView deselectRowAtIndexPath:selectedIndexPath animated:YES];
+		});
 	}
 	
 	if (_showDoneButton) {
@@ -208,10 +217,9 @@ CGRect IASKCGRectSwap(CGRect rect);
 		[dc addObserver:self selector:@selector(didChangeSettingViaIASK:) name:kIASKAppSettingChanged object:nil];
 		[self userDefaultsDidChange]; // force update in case of changes while we were hidden
 	}
-	[super viewWillAppear:animated];
 }
 
-- (CGSize)contentSizeForViewInPopover {
+- (CGSize)preferredContentSize {
     return [[self view] sizeThatFits:CGSizeMake(320, 2000)];
 }
 
@@ -417,7 +425,10 @@ CGRect IASKCGRectSwap(CGRect rect);
 
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
     IASKSpecifier *specifier  = [self.settingsReader specifierForIndexPath:indexPath];
-    if ([[specifier type] isEqualToString:kIASKCustomViewSpecifier]) {
+	if ([specifier.type isEqualToString:kIASKTextViewSpecifier]) {
+		CGFloat height = (CGFloat)[self.rowHeights[specifier.key] doubleValue];
+		return height > 0 ? height : UITableViewAutomaticDimension;
+	} else if ([[specifier type] isEqualToString:kIASKCustomViewSpecifier]) {
 		if ([self.delegate respondsToSelector:@selector(tableView:heightForSpecifier:)]) {
 			return [self.delegate tableView:tableView heightForSpecifier:specifier];
 		} else {
@@ -431,7 +442,8 @@ CGRect IASKCGRectSwap(CGRect rect);
 								  UIContentSizeCategoryMedium: @(44),
 								  UIContentSizeCategoryLarge: @(44),
 								  UIContentSizeCategoryExtraLarge: @(47)};
-	 return (CGFloat)[rowHeights[UIApplication.sharedApplication.preferredContentSizeCategory] doubleValue] ? : 51;
+	 CGFloat rowHeight = (CGFloat)[rowHeights[UIApplication.sharedApplication.preferredContentSizeCategory] doubleValue];
+	 return rowHeight != 0 ? rowHeight : 51;
 	);
 	return 44;
 }
@@ -502,6 +514,9 @@ CGRect IASKCGRectSwap(CGRect rect);
 	else if ([identifier hasPrefix:kIASKPSTextFieldSpecifier]) {
 		cell = [[IASKPSTextFieldSpecifierViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:kIASKPSTextFieldSpecifier];
 		[((IASKPSTextFieldSpecifierViewCell*)cell).textField addTarget:self action:@selector(_textChanged:) forControlEvents:UIControlEventEditingChanged];
+	}
+	else if ([identifier hasPrefix:kIASKTextViewSpecifier]) {
+        cell = [[IASKTextViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:kIASKTextViewSpecifier];
 	}
 	else if ([identifier hasPrefix:kIASKPSSliderSpecifier]) {
         cell = [[IASKPSSliderSpecifierViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:kIASKPSSliderSpecifier];
@@ -584,6 +599,7 @@ CGRect IASKCGRectSwap(CGRect rect);
 		}
 		IASKTextField *textField = ((IASKPSTextFieldSpecifierViewCell*)cell).textField;
 		textField.text = textValue;
+		textField.placeholder = specifier.placeholder;
 		textField.key = specifier.key;
 		textField.delegate = self;
 		textField.secureTextEntry = [specifier isSecure];
@@ -596,6 +612,19 @@ CGRect IASKCGRectSwap(CGRect rect);
 		}
 		textField.textAlignment = specifier.textAlignment;
 		textField.adjustsFontSizeToFitWidth = specifier.adjustsFontSizeToFitWidth;
+	}
+	else if ([specifier.type isEqualToString:kIASKTextViewSpecifier]) {
+		IASKTextViewCell *textCell = (id)cell;
+		NSString *value = [self.settingsStore objectForKey:specifier.key] != nil ? [self.settingsStore objectForKey:specifier.key] : specifier.defaultStringValue;
+		textCell.textView.text = value;
+		textCell.textView.delegate = self;
+		textCell.textView.key = specifier.key;
+		textCell.textView.keyboardType = specifier.keyboardType;
+		textCell.textView.autocapitalizationType = specifier.autocapitalizationType;
+		textCell.textView.autocorrectionType = specifier.autoCorrectionType;
+		dispatch_async(dispatch_get_main_queue(), ^{
+			[self cacheRowHeightForTextView:textCell.textView];
+		});
 	}
 	else if ([specifier.type isEqualToString:kIASKPSSliderSpecifier]) {
 		if (specifier.minimumValueImage.length > 0) {
@@ -623,7 +652,7 @@ CGRect IASKCGRectSwap(CGRect rect);
 		cell.accessoryType = (specifier.textAlignment == NSTextAlignmentLeft) ? UITableViewCellAccessoryDisclosureIndicator : UITableViewCellAccessoryNone;
 	} else if ([specifier.type isEqualToString:kIASKButtonSpecifier]) {
 		NSString *value = [self.settingsStore objectForKey:specifier.key];
-		cell.textLabel.text = [value isKindOfClass:[NSString class]] ? [self.settingsReader titleForStringId:value] : specifier.title;
+		cell.textLabel.text = ([value isKindOfClass:NSString.class] && [self.settingsReader titleForId:value].length) ? [self.settingsReader titleForId:value] : specifier.title;
 		cell.detailTextLabel.text = specifier.subtitle;
 		IASK_IF_IOS7_OR_GREATER
 		(if (specifier.textAlignment != NSTextAlignmentLeft) {
@@ -633,7 +662,7 @@ CGRect IASKCGRectSwap(CGRect rect);
 		cell.accessoryType = (specifier.textAlignment == NSTextAlignmentLeft) ? UITableViewCellAccessoryDisclosureIndicator : UITableViewCellAccessoryNone;
 	} else if ([specifier.type isEqualToString:kIASKPSRadioGroupSpecifier]) {
 		NSInteger index = [specifier.multipleValues indexOfObject:specifier.radioGroupValue];
-		cell.textLabel.text = [self.settingsReader titleForStringId:specifier.multipleTitles[index]];
+		cell.textLabel.text = [self.settingsReader titleForId:specifier.multipleTitles[index]];
 		[_selections[indexPath.section] updateSelectionInCell:cell indexPath:indexPath];
 	} else {
 		cell.textLabel.text = specifier.title;
@@ -642,7 +671,7 @@ CGRect IASKCGRectSwap(CGRect rect);
 	cell.imageView.image = specifier.cellImage;
 	cell.imageView.highlightedImage = specifier.highlightedCellImage;
     
-	if (![specifier.type isEqualToString:kIASKPSMultiValueSpecifier] && ![specifier.type isEqualToString:kIASKPSTitleValueSpecifier] && ![specifier.type isEqualToString:kIASKPSTextFieldSpecifier]) {
+	if (![specifier.type isEqualToString:kIASKPSMultiValueSpecifier] && ![specifier.type isEqualToString:kIASKPSTitleValueSpecifier] && ![specifier.type isEqualToString:kIASKPSTextFieldSpecifier] && ![specifier.type isEqualToString:kIASKTextViewSpecifier]) {
 		cell.textLabel.textAlignment = specifier.textAlignment;
 	}
 	cell.detailTextLabel.textAlignment = specifier.textAlignment;
@@ -684,9 +713,8 @@ CGRect IASKCGRectSwap(CGRect rect);
         
     } else if ([[specifier type] isEqualToString:kIASKPSTextFieldSpecifier]) {
         IASKPSTextFieldSpecifierViewCell *textFieldCell = (id)[tableView cellForRowAtIndexPath:indexPath];
-        [textFieldCell.textField becomeFirstResponder];
-
-    } else if ([[specifier type] isEqualToString:kIASKPSChildPaneSpecifier]) {
+        [textFieldCell.textField becomeFirstResponder];		
+	} else if ([[specifier type] isEqualToString:kIASKPSChildPaneSpecifier]) {
         if ([specifier viewControllerStoryBoardID]){
             NSString *storyBoardFileFromSpecifier = [specifier viewControllerStoryBoardFile];
             storyBoardFileFromSpecifier = storyBoardFileFromSpecifier && storyBoardFileFromSpecifier.length > 0 ? storyBoardFileFromSpecifier : [[NSBundle mainBundle].infoDictionary objectForKey:@"UIMainStoryboardFile"];
@@ -699,6 +727,11 @@ CGRect IASKCGRectSwap(CGRect rect);
         
         Class vcClass = [specifier viewControllerClass];
         if (vcClass) {
+			if (vcClass == [NSNull class]) {
+				NSLog(@"class '%@' not found", [specifier localizedObjectForKey:kIASKViewControllerClass]);
+				[tableView deselectRowAtIndexPath:indexPath animated:YES];
+				return;
+			}
             SEL initSelector = [specifier viewControllerSelector];
             if (!initSelector) {
                 initSelector = @selector(init);
@@ -716,6 +749,17 @@ CGRect IASKCGRectSwap(CGRect rect);
             }
 			IASK_IF_IOS7_OR_GREATER(vc.view.tintColor = self.view.tintColor;)
             [self.navigationController pushViewController:vc animated:YES];
+            return;
+		}
+			
+        NSString *segueIdentifier = [specifier segueIdentifier];
+        if (segueIdentifier) {
+			@try {
+				[self performSegueWithIdentifier:segueIdentifier sender:self];
+			} @catch (NSException *exception) {
+				NSLog(@"segue with identifier '%@' not defined", segueIdentifier);
+				[tableView deselectRowAtIndexPath:indexPath animated:YES];
+			}
             return;
         }
         
@@ -821,6 +865,8 @@ CGRect IASKCGRectSwap(CGRect rect);
             }];
 			
         } else {
+			IASK_IF_PRE_IOS8
+			(
             UIAlertView *alert = [[UIAlertView alloc]
                                   initWithTitle:NSLocalizedString(@"Mail not configured", @"InAppSettingsKit")
                                   message:NSLocalizedString(@"This device is not configured for sending Email. Please configure the Mail settings in the Settings app.", @"InAppSettingsKit")
@@ -828,8 +874,17 @@ CGRect IASKCGRectSwap(CGRect rect);
                                   cancelButtonTitle:NSLocalizedString(@"OK", @"InAppSettingsKit")
                                   otherButtonTitles:nil];
             [alert show];
+			 )
+			IASK_IF_IOS8_OR_GREATER
+			(
+			 UIAlertController *alert = [UIAlertController alertControllerWithTitle:NSLocalizedString(@"Mail not configured", @"InAppSettingsKit")
+																			message:NSLocalizedString(@"This device is not configured for sending Email. Please configure the Mail settings in the Settings app.", @"InAppSettingsKit")
+																	 preferredStyle:UIAlertControllerStyleAlert];
+			 [alert addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"OK", @"InAppSettingsKit") style:UIAlertActionStyleCancel handler:^(UIAlertAction * action) {}]];
+			 [self presentViewController:alert animated:YES completion:nil];
+			)
         }
-        
+		
     } else if ([[specifier type] isEqualToString:kIASKCustomViewSpecifier] && [self.delegate respondsToSelector:@selector(settingsViewController:tableView:didSelectCustomViewSpecifier:)]) {
         [self.delegate settingsViewController:self tableView:tableView didSelectCustomViewSpecifier:specifier];
 	} else if ([[specifier type] isEqualToString:kIASKPSRadioGroupSpecifier]) {
@@ -860,9 +915,8 @@ CGRect IASKCGRectSwap(CGRect rect);
 #pragma mark -
 #pragma mark UITextFieldDelegate Functions
 
-- (BOOL)textFieldShouldBeginEditing:(UITextField *)textField {
+- (void)textFieldDidBeginEditing:(UITextField *)textField {
 	self.currentFirstResponder = textField;
-	return YES;
 }
 
 - (void)_textChanged:(id)sender {
@@ -882,6 +936,40 @@ CGRect IASKCGRectSwap(CGRect rect);
 
 - (void)singleTapToEndEdit:(UIGestureRecognizer *)sender {
     [self.tableView endEditing:NO];
+}
+
+#pragma mark - UITextViewDelegate
+
+- (void)textViewDidEndEditing:(UITextView *)textView {
+	self.currentFirstResponder = textView;
+}
+
+- (void)textViewDidChange:(IASKTextView *)textView {
+	[self cacheRowHeightForTextView:textView];
+	
+	CGRect visibleTableRect = UIEdgeInsetsInsetRect(self.tableView.bounds, self.tableView.contentInset);
+	NSIndexPath *indexPath = [self.settingsReader indexPathForKey:textView.key];
+	CGRect cellFrame = [self.tableView rectForRowAtIndexPath:indexPath];
+	
+	if (!CGRectContainsRect(visibleTableRect, cellFrame)) {
+		[self.tableView scrollRectToVisible:CGRectInset(cellFrame, 0, - 30) animated:YES];
+	}
+
+	[_settingsStore setObject:textView.text forKey:textView.key];
+	[[NSNotificationCenter defaultCenter] postNotificationName:kIASKAppSettingChanged
+														object:textView.key
+													  userInfo:@{textView.key: textView.text}];
+	
+}
+
+- (void)cacheRowHeightForTextView:(IASKTextView *)textView {
+	CGFloat maxHeight = self.tableView.bounds.size.height - self.tableView.contentInset.top - self.tableView.contentInset.bottom - 60;
+	CGFloat contentHeight = [textView sizeThatFits:CGSizeMake(textView.frame.size.width, 10000)].height + 16;
+	self.rowHeights[textView.key] = @(MAX(44, MIN(maxHeight, contentHeight)));
+	textView.scrollEnabled = contentHeight > maxHeight;
+
+	[self.tableView beginUpdates];
+	[self.tableView endUpdates];
 }
 
 #pragma mark Notifications
