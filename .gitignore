@@ -9,3 +9,5 @@ InAppSettingsKitSampleApp/build/**
 /InAppSettingsKit.xcworkspace/xcuserdata/
 *.xccheckout
 *.xcscmblueprint
+CarthageTest
+/.swiftpm

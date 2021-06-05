@@ -1,8 +1,8 @@
 //
 //  IASKSpecifierValuesViewController.m
-//  http://www.inappsettingskit.com
+//  InAppSettingsKit
 //
-//  Copyright (c) 2009:
+//  Copyright (c) 2009-2020:
 //  Luc Vandal, Edovia Inc., http://www.edovia.com
 //  Ortwin Gentz, FutureTap GmbH, http://www.futuretap.com
 //  All rights reserved.
@@ -22,80 +22,62 @@
 #define kCellValue      @"kCellValue"
 
 @interface IASKSpecifierValuesViewController()
-
-@property (nonatomic, strong, readonly) IASKMultipleValueSelection *selection;
+@property (nonnull, nonatomic, strong) IASKSpecifier *currentSpecifier;
+@property (nonatomic, strong) IASKMultipleValueSelection *selection;
 @property (nonatomic) BOOL didFirstLayout;
 @end
 
 @implementation IASKSpecifierValuesViewController
 
-@synthesize tableView=_tableView;
-@synthesize currentSpecifier=_currentSpecifier;
 @synthesize settingsReader = _settingsReader;
 @synthesize settingsStore = _settingsStore;
+@synthesize childPaneHandler = _childPaneHandler;
+@synthesize listParentViewController;
 
-- (void)setSettingsStore:(id <IASKSettingsStore>)settingsStore {
-    _settingsStore = settingsStore;
-    _selection.settingsStore = settingsStore;
+- (id)initWithSpecifier:(IASKSpecifier*)specifier {
+	if ((self = [super initWithStyle:UITableViewStyleGrouped])) {
+		self.currentSpecifier = specifier;
+	};
+	return self;
 }
 
-- (void)loadView
-{
-    _tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStyleGrouped];
-    _tableView.autoresizingMask = UIViewAutoresizingFlexibleWidth |
-    UIViewAutoresizingFlexibleHeight;
-    _tableView.delegate = self;
-    _tableView.dataSource = self;
-    
-    self.view = _tableView;
-
-    _selection = [IASKMultipleValueSelection new];
-    _selection.tableView = _tableView;
-    _selection.settingsStore = _settingsStore;
+- (void)setSettingsStore:(id <IASKSettingsStore>)settingsStore {
+	self.selection = [[IASKMultipleValueSelection alloc] initWithSettingsStore:settingsStore tableView:self.tableView specifier:self.currentSpecifier section:0];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
-    if (_currentSpecifier) {
-        [self setTitle:[_currentSpecifier title]];
-        _selection.specifier = _currentSpecifier;
+	[super viewWillAppear:animated];
+	
+    if (self.currentSpecifier) {
+		self.title = self.currentSpecifier.title;
+		IASK_IF_IOS11_OR_GREATER(self.navigationItem.largeTitleDisplayMode = self.title.length ? UINavigationItemLargeTitleDisplayModeAutomatic : UINavigationItemLargeTitleDisplayModeNever;);
     }
     
-    if (_tableView) {
-        [_tableView reloadData];
-		_selection.tableView = _tableView;
-    }
-	self.didFirstLayout = NO;
-	[super viewWillAppear:animated];
-}
+    if (self.tableView) {
+		self.selection.tableView = self.tableView;
+		[self.tableView reloadData];
 
-- (void)viewDidAppear:(BOOL)animated {
-	[super viewDidAppear:animated];
-	[_tableView flashScrollIndicators];
-}
-
-- (void)viewDidLayoutSubviews {
-	[super viewDidLayoutSubviews];
-
-	if (!self.didFirstLayout) {
 		// Make sure the currently checked item is visible
-		// this needs to be done as early as possible when pushing the view but after the first layout
-		// otherwise scrolling to the first entry doesn't respect tableView.contentInset
-		[_tableView scrollToRowAtIndexPath:_selection.checkedItem
-						  atScrollPosition:UITableViewScrollPositionMiddle animated:NO];
-		self.didFirstLayout = YES;
+		[self.tableView scrollToRowAtIndexPath:self.selection.checkedIndexPath
+							  atScrollPosition:UITableViewScrollPositionMiddle animated:NO];
 	}
+	self.didFirstLayout = NO;
 }
 
 - (void)viewDidDisappear:(BOOL)animated {
 	[super viewDidDisappear:animated];
-    _selection.tableView = nil;
+    self.selection.tableView = nil;
 }
 
-- (void)didReceiveMemoryWarning {
-	// Releases the view if it doesn't have a superview.
-    [super didReceiveMemoryWarning];
-	
-	// Release any cached data, images, etc that aren't in use.
+- (void)viewWillLayoutSubviews {
+	[super viewWillLayoutSubviews];
+
+	if (!self.didFirstLayout) {
+		self.didFirstLayout = YES;
+		[self.tableView scrollToRowAtIndexPath:self.selection.checkedIndexPath
+							  atScrollPosition:UITableViewScrollPositionMiddle animated:NO];
+		[self.tableView flashScrollIndicators];
+	}
 }
 
 #pragma mark -
@@ -106,36 +88,46 @@
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    return [_currentSpecifier multipleValuesCount];
+    return [self.currentSpecifier multipleValuesCount];
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
-    return [_currentSpecifier footerText];
+    return [self.currentSpecifier footerText];
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     UITableViewCell *cell   = [tableView dequeueReusableCellWithIdentifier:kCellValue];
-    NSArray *titles         = [_currentSpecifier multipleTitles];
+	NSArray *titles         = self.currentSpecifier.multipleTitles;
+	NSArray *iconNames      = self.currentSpecifier.multipleIconNames;
 	
     if (!cell) {
         cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:kCellValue];
     }
 
-    [_selection updateSelectionInCell:cell indexPath:indexPath];
-
-    @try {
-		[[cell textLabel] setText:[self.settingsReader titleForId:[titles objectAtIndex:indexPath.row]]];
+    [self.selection updateSelectionInCell:cell indexPath:indexPath];
+	UIColor *textColor = [UILabel appearanceWhenContainedInInstancesOfClasses:@[UITableViewCell.class]].textColor;
+	if (textColor == nil) {
+		textColor = [UILabel appearance].textColor;
 	}
-	@catch (NSException * e) {}
+	cell.textLabel.textColor = textColor;
+    
+    @try {
+        [[cell textLabel] setText:[self.settingsReader titleForId:[titles objectAtIndex:indexPath.row]]];
+        if ((NSInteger)iconNames.count > indexPath.row) {
+            NSString *iconName = iconNames[indexPath.row];
+            // This tries to read the image from the main bundle. As this is currently not supported in
+            // system settings, this should be the correct behaviour. (Idea: abstract away and try different
+            // paths?)
+            UIImage *image = [UIImage imageNamed:iconName];
+            cell.imageView.image = image;
+        }
+    }
+    @catch (NSException * e) {}
     return cell;
 }
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
-    [_selection selectRowAtIndexPath:indexPath];
-}
-
-- (CGSize)preferredContentSize {
-    return [[self view] sizeThatFits:CGSizeMake(320, 2000)];
+    [self.selection selectRowAtIndexPath:indexPath];
 }
 
 @end
