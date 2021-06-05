@@ -1052,7 +1052,7 @@ CGRect IASKCGRectSwap(CGRect rect);
 		targetViewController.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone target:self action:@selector(listItemDone:)];
 		[self.navigationController presentViewController:navCtrl animated:YES completion:nil];
 		
-		__weak typeof(self)weakSelf = self;
+		__weak __typeof(self)weakSelf = self;
 		self.childPaneHandler = ^(BOOL doneEditing){
 			if (!doneEditing) {
 				if ([weakSelf.delegate respondsToSelector:@selector(settingsViewController:childPaneIsValidForSpecifier:contentDictionary:)]) {
